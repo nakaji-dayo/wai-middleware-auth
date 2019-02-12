@@ -17,6 +17,7 @@ import           Data.Aeson.TH                        (defaultOptions,
 import qualified Data.ByteString                      as S
 import qualified Data.ByteString.Char8                as S8 (pack)
 import qualified Data.ByteString.Lazy                 as SL
+import           Data.Maybe                           (fromJust)
 import           Data.Monoid                          ((<>))
 import           Data.Proxy                           (Proxy (..))
 import qualified Data.Text                            as T
@@ -91,6 +92,8 @@ getRedirectURI = U.serializeURIRef'
 getAccessToken :: OA2.OAuth2Token -> S.ByteString
 getAccessToken = encodeUtf8 . OA2.atoken . OA2.accessToken
 
+getIdToken = encodeUtf8 . OA2.idtoken . fromJust . OA2.idToken
+
 #else
 
 parseAbsoluteURI' :: MonadThrow m => T.Text -> m URI
@@ -113,6 +116,8 @@ getRedirectURI = id
 
 getAccessToken :: OA2.AccessToken -> S.ByteString
 getAccessToken = OA2.accessToken
+
+getIdToken = OA2.idToken
 
 #endif
 
@@ -140,7 +145,7 @@ instance AuthProvider OAuth2 where
           }
     case suffix of
       [] -> do
-        let scope = (encodeUtf8 . T.intercalate ",") <$> oa2Scope
+        let scope = (encodeUtf8 . T.intercalate "+") <$> oa2Scope
         let redirectUrl =
               getRedirectURI $
               appendQueryParams
@@ -159,7 +164,7 @@ instance AuthProvider OAuth2 where
                eRes <- OA2.fetchAccessToken man oauth2 $ getExchangeToken code
                case eRes of
                  Left err    -> onFailure status501 $ S8.pack $ show err
-                 Right token -> onSuccess $ getAccessToken token
+                 Right token -> onSuccess $ getIdToken token
              _ ->
                case lookup "error" params of
                  (Just (Just "access_denied")) ->
